@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sayı Tahmin Oyunu / Number Guess Game</title>
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Arial', sans-serif;
+  background: linear-gradient(120deg, #70c1b3, #b2f7ef, #fdfd96, #f7d794);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+  overflow: hidden;
+}
+
+@keyframes gradientBG {
+  0% {background-position:0% 50%;}
+  50% {background-position:100% 50%;}
+  100% {background-position:0% 50%;}
+}
+
+.container, .language-select {
+  background: rgba(255,255,255,0.95);
+  padding: 30px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+  width: 90%;
+  max-width: 400px;
+  opacity: 0;
+  transform: translateY(-20px);
+  animation: fadeIn 1s forwards;
+}
+
+@keyframes fadeIn { to {opacity: 1; transform: translateY(0);} }
+
+input[type="number"] {
+  width: 60%;
+  padding: 10px;
+  font-size: 18px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+button {
+  padding: 12px 25px;
+  font-size: 18px;
+  border: none;
+  border-radius: 10px;
+  background-color: #4e9ef7;
+  color: white;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+button:hover { background-color: #2e7df7; }
+
+.loading-screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(255,255,255,0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  font-size: 20px;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.loading-screen.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.loader-bar {
+  width: 80%;
+  height: 20px;
+  background: #eee;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.loader-progress {
+  height: 100%;
+  width: 0%;
+  background-color: #4e9ef7;
+  border-radius: 10px;
+  transition: width 0.1s linear;
+}
+
+.popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  background: white;
+  padding: 25px 35px;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  text-align: center;
+  font-size: 22px;
+  display: none;
+  z-index: 2000;
+  opacity: 0;
+  transition: all 0.5s ease;
+}
+
+.popup.show {
+  display: block;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.popup button { margin-top: 15px; background-color: #4e9ef7; }
+
+.language-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 1;
+}
+
+.language-select h2 {
+  margin-bottom: 20px;
+}
+
+.flag-container {
+  display: flex;
+  gap: 20px;
+}
+
+.flag-container img {
+  width: 60px;
+  height: 40px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+
+.flag-container img:hover { transform: scale(1.1); }
+</style>
+</head>
+<body>
+
+<div class="language-select" id="languageSelect">
+  <h2>Choose Language / Dil Seçiniz</h2>
+  <div class="flag-container">
+    <!-- Türk bayrağı PNG -->
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Flag_of_Turkey.svg/320px-Flag_of_Turkey.svg.png" alt="TR" onclick="setLanguage('tr')">
+    <!-- İngiliz bayrağı PNG -->
+    <img src="https://upload.wikimedia.org/wikipedia/en/a/ae/Flag_of_the_United_Kingdom.svg" alt="EN" onclick="setLanguage('en')">
+  </div>
+</div>
+
+<div class="container" id="gameContainer" style="display:none;">
+  <h2 id="title">Sayı Tahmin Oyunu</h2>
+  <p id="instruction">Tutulan sayıyı girin:</p>
+  <input type="number" id="secretNumber" placeholder="Bir sayı girin">
+  <br>
+  <button onclick="startGuess()" id="guessButton">Tahmin Et</button>
+</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div id="loadingText">Girdiğiniz sayı tahmin ediliyor...</div>
+  <div class="loader-bar">
+    <div class="loader-progress" id="loaderProgress"></div>
+  </div>
+</div>
+
+<div class="popup" id="popup">
+  <div id="popupText"></div>
+  <button onclick="closePopup()" id="popupButton">Tamam</button>
+</div>
+
+<script>
+let isGuessing = false;
+let lang = 'tr';
+
+const texts = {
+  tr: {
+    title: "Sayı Tahmin Oyunu",
+    instruction: "Tutulan sayıyı girin:",
+    placeholder: "Bir sayı girin",
+    guessButton: "Tahmin Et",
+    loading: "Girdiğiniz sayı tahmin ediliyor...",
+    popup: "Tuttuğunuz Sayı:",
+    popupButton: "Tamam",
+    alertEmpty: "Lütfen bir sayı girin!"
+  },
+  en: {
+    title: "Number Guess Game",
+    instruction: "Enter the number:",
+    placeholder: "Enter a number",
+    guessButton: "Guess",
+    loading: "Your number is being guessed...",
+    popup: "Your Number:",
+    popupButton: "OK",
+    alertEmpty: "Please enter a number!"
+  }
+};
+
+function setLanguage(selectedLang) {
+  lang = selectedLang;
+  const languageDiv = document.getElementById('languageSelect');
+  const gameDiv = document.getElementById('gameContainer');
+  // Eğer zaten açılmışsa tekrar açılmayı engelle
+  if(languageDiv.style.display === 'none') return;
+
+  languageDiv.style.display = 'none';
+  gameDiv.style.display = 'block';
+
+  document.getElementById('title').textContent = texts[lang].title;
+  document.getElementById('instruction').textContent = texts[lang].instruction;
+  document.getElementById('secretNumber').placeholder = texts[lang].placeholder;
+  document.getElementById('guessButton').textContent = texts[lang].guessButton;
+  document.getElementById('loadingText').textContent = texts[lang].loading;
+  document.getElementById('popupButton').textContent = texts[lang].popupButton;
+}
+
+function startGuess() {
+  if (isGuessing) return;
+  let num = document.getElementById('secretNumber').value;
+  if (!num) {
+    alert(texts[lang].alertEmpty);
+    return;
+  }
+
+  isGuessing = true;
+  const loadingScreen = document.getElementById('loadingScreen');
+  const loader = document.getElementById('loaderProgress');
+  const popup = document.getElementById('popup');
+
+  popup.classList.remove('show');
+  popup.style.display = 'none';
+
+  loader.style.width = '0%';
+  loadingScreen.classList.add('show');
+
+  let startTime = null;
+  const duration = 3000;
+
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp;
+    let elapsed = timestamp - startTime;
+    let progress = Math.min(elapsed / duration, 1);
+    loader.style.width = (progress * 100) + '%';
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      loadingScreen.classList.remove('show');
+      setTimeout(() => showPopup(num), 200);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function showPopup(number) {
+  const popup = document.getElementById('popup');
+  const popupText = document.getElementById('popupText');
+  popupText.textContent = `${texts[lang].popup} ${number}`;
+  popup.style.display = 'block';
+  setTimeout(() => popup.classList.add('show'), 50);
+}
+
+function closePopup() {
+  const popup = document.getElementById('popup');
+  popup.classList.remove('show');
+  setTimeout(() => {
+    popup.style.display = 'none';
+    isGuessing = false;
+  }, 500);
+}
+</script>
+</body>
+</html>
